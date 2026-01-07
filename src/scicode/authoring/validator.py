@@ -30,16 +30,21 @@ class TaskValidator:
         "math",
         "mathematics",
         "materials",
+        "data science",
+        "finance",
         "other",
     ]
     
     VALID_SUBDOMAINS = {
-        "mathematics": ["Numerical Linear Algebra", "Computational Mechanics"],
-        "math": ["Numerical Linear Algebra", "Computational Mechanics"],
-        "physics": ["Optics", "Computational Physics", "Quantum Information", "Particle Physics"],
-        "chemistry": ["Computational Chemistry"],
-        "materials": ["Semiconductor Materials"],
-        "biology": ["Biochemistry"],
+        "mathematics": ["Numerical Linear Algebra", "Computational Mechanics", "Other"],
+        "math": ["Numerical Linear Algebra", "Computational Mechanics", "Other"],
+        "physics": ["Optics", "Computational Physics", "Quantum Information", "Particle Physics", "Other"],
+        "chemistry": ["Computational Chemistry", "Other"],
+        "materials": ["Semiconductor Materials", "Other"],
+        "biology": ["Biochemistry", "Other"],
+        "data science": ["Statistical Inference", "Probabilistic modeling", "Optimization", "Other"],
+        "finance": ["Finance", "Computational Finance", "Other"],
+        "other": ["Other"],
     }
     
     def __init__(self, task_dir: Path):
