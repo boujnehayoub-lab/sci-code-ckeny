@@ -1,120 +1,145 @@
 # =============================================================================
 # Task Definition
 # =============================================================================
-#
-# This file defines your task's metadata and structure.
-#
-# WORKFLOW:
-# 1. Run: task new my_task_name
-# 2. Edit this file - fill in all sections below
-# 3. Edit steps/*.py - implement each sub-problem
-# 4. (Optional) Edit background/*.md - add domain context
-# 5. Run: task validate tasks/my_task_name/
-# 6. Run: task compile tasks/my_task_name/
-#
-# =============================================================================
-
 
 # TASK IDENTIFIER
 # ---------------
-# A unique name for your task. Use descriptive snake_case names.
-# Examples: lennard_jones_potential, protein_folding, fft_implementation
-problem_id: "your_task_name"
+problem_id: "american_option_pricing_under_time_varying_rough_volatility"
 
 # DISPLAY NAME
 # ------------
-# Human-readable title shown in listings and reports.
-problem_name: "Your Task Title"
+problem_name: "American Option Pricing Under Time-Varying Rough Volatility"
 
 # DOMAIN
 # ------
-# Category for organization (physics, chemistry, biology, mathematics)
-domain: "your_domain"
+domain: "finance"
 
 # Subdomain for organization
-# Mathematics: (Numerical Linear Algebra, Computational Mechanics)
-# Physics: (Optics, Computational Physics, Quantum Information, Particle Physics)
-# Chemistry: (Computational Chemistry)
-# Material Science: (Semiconductor Materials)
-# Biology: (Biochemistry)
-subdomain: "your_subdomain"
+subdomain: "Computational Finance"
 
 
 # =============================================================================
 # PROBLEM DESCRIPTION (shown to LLM as context)
 # =============================================================================
-# Describe the overall problem. This appears at the start of prompts.
 
 description: |
-  Describe the problem you're asking the model to solve.
+  Your task is to implement a modular framework for pricing American options under 
+  time-varying rough volatility using signature-based methods. This framework extends 
+  the signature pricing approach by incorporating three practical innovations from the 
+  attached paper:
   
-  What is the goal? What does a complete solution accomplish?
+  1. **Gradient-boosted ensemble forecasting**: Use XGBoost to estimate and forecast 
+     the time-varying Hurst parameter H(t) from rolling windows of volatility data.
   
-  Include any important context about the domain or application.
+  2. **Regime-switching volatility models**: Dynamically choose between rough Bergomi 
+     (for rough volatility regimes, H < 0.5) and Heston (for smooth regimes, H ≥ 0.5) 
+     based on forecasted Hurst parameter.
+  
+  3. **Efficient kernel approximation**: Use Random Fourier Features (RFF) to accelerate 
+     signature-kernel evaluations while preserving accuracy.
+  
+  The implementation is organized into sequential steps (currently implementing steps 1-3):
+  1. Estimate Hurst parameter from demeaned log returns using R/S statistic
+  2. Forecast future Hurst values using XGBoost gradient-boosted ensemble
+  3. Select volatility engine (rough Bergomi or Heston) based on forecasted Hurst
+  
+  Additional steps will be implemented incrementally to complete the full pipeline.
+  
+  Assumptions and Simplifications for SciCode:
+  - Reduced scale: 100-500 paths (vs paper's 32,768), 10-20 time steps (vs 252)
+  - Signature degree 2, level 2 (vs paper's degree 3, level 3)
+  - XGBoost with n_estimators=100 (reduced from paper's full scale)
+  - RFF dimension D=32 (vs paper's 128)
+  - All inputs are synthetic, deterministic data (no external downloads)
 
 
 # =============================================================================
 # I/O SPECIFICATION (shown to LLM)
 # =============================================================================
-# Document the overall input/output contract. This helps the model understand
-# what data types and formats to expect.
 
 io_spec: |
   """
-  Task Title
+  American Option Pricing Under Time-Varying Rough Volatility
   
-  Brief description of inputs and outputs across all steps.
+  This task implements a multi-step pipeline for pricing American options under 
+  time-varying rough volatility using signature-based methods.
   
   Parameters
   ----------
-  param1 : type
-      Description
-  param2 : type
-      Description
+  The task is currently decomposed into 3 sequential steps, each with its own function:
+  
+  Step 1 - estimate_hurst_parameter(returns):
+    returns : np.ndarray, shape (n,)
+      Demeaned log returns (n >= 8 required).
+    Returns: hurst : float in [0, 1]
+  
+  Step 2 - forecast_hurst_path(historical_hurst, horizon, ...):
+    historical_hurst : np.ndarray, shape (5,)
+      Five most recent Hurst values [H_{t-4}, ..., H_t].
+    horizon : int
+      Forecast horizon (number of steps, typically 5-20).
+    Returns: forecasted_hurst : np.ndarray, shape (horizon,)
+  
+  Step 3 - select_volatility_engine(forecasted_hurst, threshold=0.5):
+    forecasted_hurst : np.ndarray, shape (horizon,)
+      Forecasted Hurst parameter path.
+    Returns: engine : str ('rough_bergomi' or 'heston')
   
   Returns
   -------
-  result : type
-      What the final solution returns
+  Step 3 returns a string indicating the selected volatility engine:
+  - 'rough_bergomi': Selected when average forecasted Hurst < threshold (rough volatility regime)
+  - 'heston': Selected when average forecasted Hurst >= threshold (smooth volatility regime)
   
   Units
   -----
-  Specify units if applicable (SI, etc.)
+  - Hurst parameter: dimensionless, in [0, 1]
   """
 
 
 # =============================================================================
 # DEPENDENCIES
 # =============================================================================
-# Python imports available to the model. These are prepended to generated code.
 
 dependencies:
   - import numpy as np
-  # Add more as needed:
-  # - import scipy as sp
-  # - from scipy import linalg
-  # - import math
+  - import xgboost as xgb
 
 
 # =============================================================================
 # STEPS
 # =============================================================================
-# List of step files in order (without .py extension).
-# Each step should have a corresponding file: steps/01_step_name.py
-# Steps are solved sequentially - later steps can use earlier functions.
 
 steps:
-  - 01_step_name
-  # - 02_another_step
-  # - 03_final_step
+  - 01_estimate_hurst_parameter
+  - 02_forecast_hurst_path
+  - 03_select_volatility_engine
 
 
 # =============================================================================
 # BACKGROUND (OPTIONAL)
 # =============================================================================
-# Overall background shown when with_background=True.
-# Leave empty or delete if not needed.
 
 background_main: |
-  Optional: General background context for the entire problem.
-  Delete this section if not needed.
+  This task implements a modular framework for American option pricing under time-varying 
+  rough volatility, extending the signature pricing framework with three practical innovations:
+  
+  1. **Gradient-Boosted Ensemble Forecasting**: The paper's first innovation uses XGBoost 
+     to estimate and forecast the time-varying Hurst parameter H(t) from rolling windows 
+     of recent volatility data. This enables dynamic adaptation to changing market roughness.
+  
+  2. **Regime-Switching Volatility Models**: The framework dynamically selects between 
+     rough Bergomi (for rough volatility regimes where H < 0.5) and Heston (for smooth 
+     regimes where H ≥ 0.5) based on forecasted Hurst parameter. This hybrid approach 
+     adapts to changing volatility roughness.
+  
+  3. **Random Fourier Features (RFF)**: The third innovation accelerates signature-kernel 
+     evaluations using Random Fourier Features, reducing computational cost from O(m) to 
+     O(D) per kernel evaluation while preserving accuracy.
+  
+  The current implementation (steps 1-3):
+  - Estimates Hurst parameter using rescaled-range (R/S) statistic
+  - Forecasts future Hurst values using XGBoost gradient-boosted ensemble
+  - Selects volatility engine (rough Bergomi or Heston) based on forecast
+  
+  Additional steps will be implemented incrementally to complete the full pipeline.
