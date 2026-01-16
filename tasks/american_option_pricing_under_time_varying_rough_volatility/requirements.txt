@@ -1,0 +1,15 @@
+# Dependencies for American Option Pricing Under Time-Varying Rough Volatility task
+# Install with: pip install -r requirements.txt
+
+# Core dependencies (already in pyproject.toml, but listed for completeness)
+numpy>=1.20.0
+
+# Step 2: Forecast Hurst Path
+xgboost>=2.0.0
+scikit-learn>=1.0.0  # Required by xgboost
+
+# Step 4: Calibrate Parameters (scipy.stats)
+# Step 8: Compute Option Price Bounds (scipy.linalg, scipy.optimize)
+scipy>=1.9.0
+
+# Step 6: Compute Path Signatures (manual numpy implementation, no external library needed)
