@@ -185,8 +185,9 @@ def save_data_to_hdf5(key, value, h5file):
         else:
             subgroup.create_dataset('indices', data=value.indices)
             subgroup.create_dataset('indptr', data=value.indptr)
-    elif isinstance(value, (int, float, str, complex, bool,
-                            np.bool_, np.int_, np.ndarray)):
+    elif isinstance(value, (int, float, str, complex, bool, np.ndarray)) or \
+         (hasattr(np, 'bool_') and isinstance(value, np.bool_)) or \
+         (hasattr(np, 'int_') and isinstance(value, np.int_)):
         h5file.create_dataset(key, data=value)
     else:
         print(type(value))
@@ -195,15 +196,20 @@ def save_data_to_hdf5(key, value, h5file):
 
 def save_dict_to_hdf5(data_dict, h5file):
     for key, value in data_dict.items():
-        if isinstance(key, (Symbol, np.float_)):
+        # Handle numeric keys that need to be converted to strings
+        # NumPy 2.0 compatibility: np.float_ removed, use float or np.float64
+        if isinstance(key, Symbol):
+            key = str(key)
+        elif isinstance(key, (float, np.float64, np.float32, np.number)):
             key = str(key)
         if isinstance(value, dict):
             subgroup = h5file.create_group(key)
             save_dict_to_hdf5(value, subgroup)
         elif isinstance(value, (list, tuple)):
             h5file.create_dataset(key, data=np.array(value))
-        elif isinstance(value, (int, float, str, complex, bool,
-                                np.bool_, np.ndarray)):
+        elif isinstance(value, (int, float, str, complex, bool, np.ndarray)) or \
+             (hasattr(np, 'bool_') and isinstance(value, np.bool_)) or \
+             (hasattr(np, 'int_') and isinstance(value, np.int_)):
             h5file.create_dataset(key, data=value)
         elif isinstance(value, (scipy.sparse.csr_matrix, scipy.sparse.csc_matrix,
                                 scipy.sparse.bsr_matrix, scipy.sparse.coo_matrix)):

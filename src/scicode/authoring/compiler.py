@@ -450,7 +450,13 @@ class TaskCompiler:
                     group = h5f.create_group(group_path)
                     
                     # Store target value
-                    if isinstance(target, np.ndarray):
+                    if isinstance(target, dict):
+                        # Save dictionary as a group (var1) with keys as datasets
+                        # This matches how process_hdf5_to_tuple expects single-variable dicts
+                        from scicode.parse.parse import save_dict_to_hdf5
+                        var1_group = group.create_group("var1")
+                        save_dict_to_hdf5(target, var1_group)
+                    elif isinstance(target, np.ndarray):
                         group.create_dataset("var1", data=target)
                     elif isinstance(target, (int, float)):
                         group.create_dataset("var1", data=target)

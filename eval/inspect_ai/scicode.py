@@ -238,6 +238,14 @@ _original_allclose = np.allclose
 
 def _robust_allclose(a, b, rtol=1e-05, atol=1e-08):
     '''Compare two values, handling tuples with mixed types.'''
+    # Handle strings with direct equality comparison
+    if isinstance(a, str) or isinstance(b, str):
+        return a == b
+    # Handle dictionaries by comparing keys and values recursively
+    if isinstance(a, dict) and isinstance(b, dict):
+        if set(a.keys()) != set(b.keys()):
+            return False
+        return all(_robust_allclose(a[k], b[k], rtol, atol) for k in a.keys())
     if isinstance(a, tuple) and isinstance(b, tuple):
         if len(a) != len(b):
             return False
