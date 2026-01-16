@@ -38,12 +38,15 @@ description: |
   3. **Efficient kernel approximation**: Use Random Fourier Features (RFF) to accelerate 
      signature-kernel evaluations while preserving accuracy.
   
-  The implementation is organized into sequential steps (currently implementing steps 1-3):
+  The implementation is organized into 8 sequential steps:
   1. Estimate Hurst parameter from demeaned log returns using R/S statistic
   2. Forecast future Hurst values using XGBoost gradient-boosted ensemble
   3. Select volatility engine (rough Bergomi or Heston) based on forecasted Hurst
-  
-  Additional steps will be implemented incrementally to complete the full pipeline.
+  4. Calibrate model parameters from synthetic price and volatility data
+  5. Simulate variance paths using the selected volatility engine
+  6. Compute path signatures from variance paths using numerical integration
+  7. Apply Random Fourier Features to embed signatures efficiently
+  8. Compute option price bounds using signature-based optimal stopping (FINAL INTEGRATION)
   
   Assumptions and Simplifications for SciCode:
   - Reduced scale: 100-500 paths (vs paper's 32,768), 10-20 time steps (vs 252)
@@ -66,7 +69,7 @@ io_spec: |
   
   Parameters
   ----------
-  The task is currently decomposed into 3 sequential steps, each with its own function:
+  The task is decomposed into 8 sequential steps, each with its own function:
   
   Step 1 - estimate_hurst_parameter(returns):
     returns : np.ndarray, shape (n,)
@@ -85,11 +88,92 @@ io_spec: |
       Forecasted Hurst parameter path.
     Returns: engine : str ('rough_bergomi' or 'heston')
   
+  Step 4 - calibrate_parameters(engine, price_data, vol_data, historical_hurst, dt):
+    engine : str
+      'rough_bergomi' or 'heston'.
+    price_data : np.ndarray, shape (n,)
+      Synthetic log price series (or log returns).
+    vol_data : np.ndarray, shape (n,)
+      Synthetic implied volatility series (ATM).
+    historical_hurst : float
+      Most recent historical Hurst parameter.
+    dt : float, optional
+      Time step (default 1/252 for daily).
+    Returns: params : dict
+      Dictionary with keys 'rho', 'eta', 'xi0', and optionally 'kappa', 'theta' (for Heston)
+  
+  Step 5 - simulate_volatility_paths(engine, params, num_paths, num_steps, dt, hurst_path, random_state):
+    engine : str
+      'rough_bergomi' or 'heston'.
+    params : dict
+      Calibrated parameters from step 4.
+    num_paths : int
+      Number of paths (M, typically 100-500 for SciCode).
+    num_steps : int
+      Number of time steps (N, typically 10-20 for SciCode).
+    dt : float
+      Time step size.
+    hurst_path : np.ndarray, shape (num_steps,), optional
+      Time-varying Hurst path (required for rough Bergomi).
+    random_state : int, optional
+      Random seed for reproducibility.
+    Returns: variance_paths : np.ndarray, shape (num_paths, num_steps)
+      Simulated variance paths. All values must be > 0.
+  
+  Step 6 - compute_path_signatures(variance_paths, degree, level):
+    variance_paths : np.ndarray, shape (num_paths, num_steps)
+      Variance paths from step 5.
+    degree : int, optional
+      Signature truncation degree (default 2 for SciCode).
+    level : int, optional
+      Signature truncation level (default 2 for SciCode).
+    Returns: signatures : np.ndarray, shape (num_paths, m)
+      Signature vectors where m = degree + 1.
+      For degree=2, m = 3.
+  
+  Step 7 - apply_random_fourier_features(signatures, D, gamma, random_state):
+    signatures : np.ndarray, shape (num_paths, m)
+      Signature vectors from step 6.
+    D : int, optional
+      RFF dimension (default 32 for SciCode).
+    gamma : float, optional
+      Kernel bandwidth parameter (default 1.0).
+    random_state : int, optional
+      Random seed for projection matrix (for reproducibility).
+    Returns: rff_embeddings : np.ndarray, shape (num_paths, 2*D)
+      RFF embeddings (sine and cosine concatenated).
+  
+  Step 8 - compute_option_price_bounds(rff_embeddings, variance_paths, initial_price, strike, risk_free_rate, exercise_dates, dt, method, random_state):
+    rff_embeddings : np.ndarray, shape (num_paths, 2*D)
+      RFF embeddings from step 7 (features for regression).
+    variance_paths : np.ndarray, shape (num_paths, num_steps)
+      Variance paths from step 5. Used to generate asset price paths.
+    initial_price : float
+      Initial asset price S_0.
+    strike : float
+      Option strike price K.
+    risk_free_rate : float
+      Risk-free interest rate r.
+    exercise_dates : np.ndarray, shape (n_exercise,)
+      Time indices where early exercise is allowed.
+    dt : float
+      Time step size.
+    method : str, optional
+      Regression method: 'linear' (default).
+    random_state : int, optional
+      Random seed for asset path generation (for reproducibility).
+    Returns: bounds : dict
+      Dictionary with keys:
+      - 'lower_bound': float, primal (lower) bound on option price
+      - 'upper_bound': float, dual (upper) bound on option price
+      - 'duality_gap': float, upper_bound - lower_bound
+      - 'duality_gap_percent': float, (duality_gap / lower_bound) * 100
+  
   Returns
   -------
-  Step 3 returns a string indicating the selected volatility engine:
-  - 'rough_bergomi': Selected when average forecasted Hurst < threshold (rough volatility regime)
-  - 'heston': Selected when average forecasted Hurst >= threshold (smooth volatility regime)
+  Step 8 (FINAL INTEGRATION) returns a dictionary of option price bounds:
+  - bounds: dict with keys 'lower_bound', 'upper_bound', 'duality_gap', 'duality_gap_percent'
+    All values are floats. Lower bound ≤ upper bound (primal-dual property)
   
   Units
   -----
@@ -104,6 +188,8 @@ io_spec: |
 dependencies:
   - import numpy as np
   - import xgboost as xgb
+  - from scipy.stats import pearsonr
+  - from scipy.linalg import lstsq
 
 
 # =============================================================================
@@ -114,6 +200,11 @@ steps:
   - 01_estimate_hurst_parameter
   - 02_forecast_hurst_path
   - 03_select_volatility_engine
+  - 04_calibrate_parameters
+  - 05_simulate_volatility_paths
+  - 06_compute_path_signatures
+  - 07_apply_random_fourier_features
+  - 08_compute_option_price_bounds
 
 
 # =============================================================================
@@ -137,9 +228,12 @@ background_main: |
      evaluations using Random Fourier Features, reducing computational cost from O(m) to 
      O(D) per kernel evaluation while preserving accuracy.
   
-  The current implementation (steps 1-3):
+  The complete implementation (steps 1-8):
   - Estimates Hurst parameter using rescaled-range (R/S) statistic
   - Forecasts future Hurst values using XGBoost gradient-boosted ensemble
   - Selects volatility engine (rough Bergomi or Heston) based on forecast
-  
-  Additional steps will be implemented incrementally to complete the full pipeline.
+  - Calibrates model parameters from synthetic data
+  - Simulates variance paths using selected engine
+  - Computes path signatures from variance paths
+  - Applies Random Fourier Features for efficient kernel approximation
+  - Computes option price bounds using signature-based optimal stopping (FINAL INTEGRATION)

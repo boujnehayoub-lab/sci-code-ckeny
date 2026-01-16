@@ -12,5 +12,4 @@ scikit-learn>=1.0.0  # Required by xgboost
 # Step 8: Compute Option Price Bounds (scipy.linalg, scipy.optimize)
 scipy>=1.9.0
 
-# Step 6: Compute Path Signatures
-iisignature>=0.24
+# Step 6: Compute Path Signatures (manual numpy implementation, no external library needed)
