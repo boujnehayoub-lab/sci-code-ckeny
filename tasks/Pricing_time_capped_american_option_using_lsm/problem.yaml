@@ -1,0 +1,181 @@
+# =============================================================================
+# Task Definition
+# =============================================================================
+#
+# This file defines your task's metadata and structure.
+#
+# WORKFLOW:
+# 1. Run: task new my_task_name
+# 2. Edit this file - fill in all sections below
+# 3. Edit steps/*.py - implement each sub-problem
+# 4. (Optional) Edit background/*.md - add domain context
+# 5. Run: task validate tasks/my_task_name/
+# 6. Run: task compile tasks/my_task_name/
+#
+# =============================================================================
+
+
+# TASK IDENTIFIER
+# ---------------
+problem_id: "pricing_time_capped_american_option_lsm"
+
+# DISPLAY NAME
+# ------------
+problem_name: "Pricing Time-Capped American Options Using Least Squares Monte Carlo"
+
+# DOMAIN
+# ------
+domain: "finance"
+
+# Subdomain for organization
+subdomain: "Computational Finance"
+
+
+# =============================================================================
+# PROBLEM DESCRIPTION (shown to LLM as context)
+# =============================================================================
+
+description: |
+  Your task is to implement the Least Squares Monte Carlo (LSM) method for pricing 
+  time-capped American options, based on the research paper provided.
+  
+  A time-capped American option is an American-style option with an additional 
+  constraint: the option must be exercised before or at a specified time cap θ,
+  which may be deterministic or random. This constraint modifies the optimal exercise 
+  policy compared to standard American options.
+  
+  The first steps of the LSM method involve:
+  1) Generating Monte Carlo paths for the underlying asset price using a geometric 
+     Lévy process (spectrally negative Lévy process with compound Poisson jumps)
+  2) Determining the time-cap occurrence for each path based on drawdown events
+  
+  A complete solution will eventually implement all steps of the LSM algorithm with 
+  proper handling of the time cap constraint, producing accurate option prices 
+  that converge as the number of paths and time steps increase.
+
+
+# =============================================================================
+# I/O SPECIFICATION (shown to LLM)
+# =============================================================================
+
+io_spec: |
+  """
+  Pricing Time-Capped American Options Using Least Squares Monte Carlo
+  
+  Implements the LSM algorithm to price American options with time cap constraints.
+  
+  Parameters
+  ----------
+  S0 : float
+      Initial stock price (must be > 0).
+  mu : float
+      Drift parameter for Lévy process.
+  sigma : float
+      Volatility parameter (must be >= 0).
+  lambda_param : float
+      Jump intensity for Poisson process (must be >= 0).
+  rho : float
+      Parameter for exponential jump distribution (must be > 0). Mean jump size is 1/rho.
+  T : float
+      Time to maturity in years (must be > 0).
+  n_steps : int
+      Number of time steps for discretization (must be >= 1).
+  n_paths : int
+      Number of Monte Carlo paths to simulate (must be >= 1).
+  seed : int
+      Random seed for reproducibility.
+  drawdown_threshold : float
+      Drawdown threshold C where 0 < C <= 1.
+  initial_max : float
+      Initial maximum (historical maximum until option issue date, must be > 0).
+  K : float
+      Strike price (must be > 0). Used in step 3 for calculating payoffs.
+  option_type : str
+      Type of option: 'put' or 'call' (case-insensitive). Used in step 3.
+  n_basis : int
+      Number of basis functions for regression (must be >= 1). Used in step 4.
+  r : float
+      Risk-free interest rate (default: 0.0). Used in step 8 for discounting.
+  
+  Returns
+  -------
+  Intermediate outputs given by functions in different steps:
+  - paths : np.ndarray
+      Monte Carlo paths of shape (n_paths, n_steps+1) (output of step 1).
+  - time_cap_indices : np.ndarray
+      Time cap occurrence indices of shape (n_paths,) (output of step 2).
+      Values are integers in [0, n_steps]. If θ never occurs, returns n_steps.
+  - payoffs : np.ndarray
+      Immediate exercise payoffs of shape (n_paths, n_steps+1) (output of step 3).
+      G(S_t) = max(K - S_t, 0) for put, max(S_t - K, 0) for call.
+  - basis_matrix : np.ndarray
+      Basis function evaluations of shape (n_paths, n_basis) (output of step 4).
+      Weighted Laguerre polynomials φ_k(S) evaluated at asset prices.
+  - continuation_values : np.ndarray
+      Estimated continuation values of shape (n_paths,) (output of step 5).
+      Values estimated via least squares regression with indicator I_{ti<θ}.
+  - exercise_decision : np.ndarray
+      Boolean array of shape (n_paths,) indicating exercise decisions (output of step 6).
+      True indicates exercise, False indicates continuation.
+  - value_function : np.ndarray
+      Updated value function of shape (n_paths,) (output of step 7).
+      Value = payoff if exercise, value = continuation_value if continue.
+  - option_price : float
+      Final option price (output of step 8).
+      Computed as the average of value function at time 0 across all paths.
+  
+  Units
+  -----
+  - Prices are in currency units
+  - Time is in years
+  - Volatility and drift are annualized
+  """
+
+
+# =============================================================================
+# DEPENDENCIES
+# =============================================================================
+
+dependencies:
+  - import numpy as np
+  - from typing import Tuple
+
+
+# =============================================================================
+# STEPS
+# =============================================================================
+
+steps:
+  - 01_generate_levy_paths
+  - 02_determine_time_cap
+  - 03_calculate_payoffs
+  - 04_evaluate_basis_functions
+  - 05_estimate_continuation_values
+  - 06_determine_exercise_decision
+  - 07_update_value_function
+  - 08_price_time_capped_option
+
+
+# =============================================================================
+# BACKGROUND (OPTIONAL)
+# =============================================================================
+
+background_main: |
+  The Least Squares Monte Carlo (LSM) method, introduced by Longstaff and Schwartz (2001),
+  is a powerful technique for pricing American-style options. The key insight is to use 
+  least squares regression to estimate the continuation value (the value of holding the 
+  option) at each exercise date.
+  
+  For a time-capped American option, the exercise decision must account for both:
+  1. The immediate exercise value vs. continuation value (standard American option logic)
+  2. The constraint that exercise must occur before or at time $T_c$
+  
+  The algorithm proceeds backward in time from maturity:
+  - At maturity, exercise if in-the-money
+  - At each earlier time step $t$, compare immediate exercise value $h(S_t)$ with 
+    estimated continuation value $\hat{C}(S_t)$
+  - Exercise if $h(S_t) \geq \hat{C}(S_t)$ and $t \leq T_c$
+  - Use least squares regression on in-the-money paths to estimate continuation values
+  
+  The option price is computed as the discounted average of cash flows along all paths,
+  where cash flows occur at the optimal exercise times determined by the algorithm.
