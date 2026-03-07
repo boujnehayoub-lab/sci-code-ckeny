@@ -1,0 +1,120 @@
+# =============================================================================
+# Task Definition
+# =============================================================================
+#
+# This file defines your task's metadata and structure.
+#
+# WORKFLOW:
+# 1. Run: task new my_task_name
+# 2. Edit this file - fill in all sections below
+# 3. Edit steps/*.py - implement each sub-problem
+# 4. (Optional) Edit background/*.md - add domain context
+# 5. Run: task validate tasks/my_task_name/
+# 6. Run: task compile tasks/my_task_name/
+#
+# =============================================================================
+
+
+# TASK IDENTIFIER
+# ---------------
+# A unique name for your task. Use descriptive snake_case names.
+# Examples: lennard_jones_potential, protein_folding, fft_implementation
+problem_id: "your_task_name"
+
+# DISPLAY NAME
+# ------------
+# Human-readable title shown in listings and reports.
+problem_name: "Your Task Title"
+
+# DOMAIN
+# ------
+# Category for organization (physics, chemistry, biology, mathematics)
+domain: "your_domain"
+
+# Subdomain for organization
+# Mathematics: (Numerical Linear Algebra, Computational Mechanics)
+# Physics: (Optics, Computational Physics, Quantum Information, Particle Physics)
+# Chemistry: (Computational Chemistry)
+# Material Science: (Semiconductor Materials)
+# Biology: (Biochemistry)
+subdomain: "your_subdomain"
+
+
+# =============================================================================
+# PROBLEM DESCRIPTION (shown to LLM as context)
+# =============================================================================
+# Describe the overall problem. This appears at the start of prompts.
+
+description: |
+  Describe the problem you're asking the model to solve.
+  
+  What is the goal? What does a complete solution accomplish?
+  
+  Include any important context about the domain or application.
+
+
+# =============================================================================
+# I/O SPECIFICATION (shown to LLM)
+# =============================================================================
+# Document the overall input/output contract. This helps the model understand
+# what data types and formats to expect.
+
+io_spec: |
+  """
+  Task Title
+  
+  Brief description of inputs and outputs across all steps.
+  
+  Parameters
+  ----------
+  param1 : type
+      Description
+  param2 : type
+      Description
+  
+  Returns
+  -------
+  result : type
+      What the final solution returns
+  
+  Units
+  -----
+  Specify units if applicable (SI, etc.)
+  """
+
+
+# =============================================================================
+# DEPENDENCIES
+# =============================================================================
+# Python imports available to the model. These are prepended to generated code.
+
+dependencies:
+  - import numpy as np
+  # Add more as needed:
+  # - import scipy as sp
+  # - from scipy import linalg
+  # - import math
+
+
+# =============================================================================
+# STEPS
+# =============================================================================
+# List of step files in order (without .py extension).
+# Each step should have a corresponding file: steps/01_step_name.py
+# Steps are solved sequentially - later steps can use earlier functions.
+
+steps:
+  - 01_step_name
+  # - 02_another_step
+  # - 03_final_step
+
+
+# =============================================================================
+# BACKGROUND (OPTIONAL)
+# =============================================================================
+# Overall background shown when with_background=True.
+# Leave empty or delete if not needed.
+
+background_main: |
+  Optional: General background context for the entire problem.
+  Delete this section if not needed.
